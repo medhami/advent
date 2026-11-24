@@ -35,7 +35,7 @@ html,body{margin:0;height:100%;background:#1a0a15;font-family:"Trebuchet MS","Se
 .stat .bar{height:9px;background:#0002;border-radius:5px;overflow:hidden}
 .stat .bar i{display:block;height:100%;border-radius:5px}
 .stat b{text-align:right}
-.stat.atk i{background:var(--red)} .stat.def i{background:var(--blue)} .stat.hp i{background:var(--green)}
+.stat.atk i{background:var(--red)} .stat.def i{background:var(--blue)} .stat.hp i{background:var(--green)} .stat.sta i{background:#e0a010}
 .card small{font-size:10.5px;opacity:.7;margin-top:2px}
 
 /* ---------- BITVA ---------- */
@@ -54,6 +54,9 @@ html,body{margin:0;height:100%;background:#1a0a15;font-family:"Trebuchet MS","Se
 .shieldrow{display:flex;gap:3px;align-items:center;font-size:10px;font-weight:800;margin-top:2px}
 .shieldrow svg{width:17px;height:19px}
 .shieldrow .off path{fill:#0002;stroke:#0004}
+.shieldrow .lbl{width:auto;height:auto;font-size:10px;min-width:44px;opacity:.75}
+.shieldrow .bolt{width:15px;height:19px}
+.shieldrow .bolt.off path{fill:#0002;stroke:#0004}
 
 .fighter{position:absolute;z-index:3}
 .fighter .sprite{height:100%;display:block;transform-origin:50% 100%}
@@ -128,9 +131,9 @@ html,body{margin:0;height:100%;background:#1a0a15;font-family:"Trebuchet MS","Se
     <div id="panel">
       <div id="msg"></div>
       <div id="btns">
-        <button class="btn atk" id="bAtk"><span class="ic">⚔️</span>Útok</button>
+        <button class="btn atk" id="bAtk"><span class="ic">⚔️</span>Útok<small id="atkCount"></small></button>
         <button class="btn def" id="bDef"><span class="ic">🛡️</span>Obrana<small id="defCount"></small></button>
-        <button class="btn chg" id="bChg"><span class="ic">⚡</span>Nabít<small>obranu</small></button>
+        <button class="btn chg" id="bChg"><span class="ic">⚡</span>Nabít<small>útok</small></button>
       </div>
     </div>
   </section>
@@ -143,23 +146,24 @@ html,body{margin:0;height:100%;background:#1a0a15;font-family:"Trebuchet MS","Se
    =====================================================================
    hp          = životy postavy
    attack      = kolik životů ubere při zásahu
-   shieldStart = kolik obran má postava na začátku souboje
-   shieldMax   = kolik obran si může maximálně držet v zásobě
+   defense     = kolik obran má postava k dispozici za celý souboj (veřejné, neobnovuje se)
+   stamina     = výdrž: kolik nabitých útoků může mít postava najednou v zásobě (neveřejné)
+   attackStart = kolik útoků má postava nabito už na začátku souboje (0 nebo 1…)
    flip        = true, pokud je potřeba obrázek zrcadlově otočit
    (Čísla jsou zatím jen zkušební – klidně je přepiš.)
 */
 const CHARACTERS = [
-  { id:'zber',      name:'Žber',      img:'images/zber.png',      hp:140, attack:10, shieldStart:1, shieldMax:3, flip:false },
-  { id:'ambroz',    name:'Ambrož',    img:'images/ambroz.png',    hp: 90, attack:22, shieldStart:0, shieldMax:2, flip:false },
-  { id:'barborka',  name:'Barborka',  img:'images/barborka.png',  hp:110, attack:14, shieldStart:1, shieldMax:2, flip:false },
-  { id:'barborka2', name:'Barborka II', img:'images/barborka2.png', hp:100, attack:16, shieldStart:1, shieldMax:2, flip:false },
-  { id:'lucka',     name:'Lucka',     img:'images/lucka.png',     hp: 95, attack:15, shieldStart:1, shieldMax:3, flip:false },
-  { id:'mikulas',   name:'Mikuláš',   img:'images/mikulas.png',   hp:120, attack:14, shieldStart:1, shieldMax:2, flip:false },
-  { id:'perchta',   name:'Perchta',   img:'images/perchta.png',   hp:100, attack:20, shieldStart:0, shieldMax:2, flip:false },
+  { id:'zber',      name:'Žber',      img:'images/zber.png',      hp:145, attack:10, defense:6, stamina:2, attackStart:1, flip:false },
+  { id:'ambroz',    name:'Ambrož',    img:'images/ambroz.png',    hp:85, attack:20, defense:2, stamina:2, attackStart:0, flip:false },
+  { id:'barborka',  name:'Barborka',  img:'images/barborka.png',  hp:110, attack:15, defense:4, stamina:1, attackStart:0, flip:false },
+  { id:'barborka2', name:'Barborka II', img:'images/barborka2.png', hp:100, attack:18, defense:3, stamina:1, attackStart:0, flip:false },
+  { id:'lucka',     name:'Lucka',     img:'images/lucka.png',     hp:100, attack:15, defense:5, stamina:3, attackStart:1, flip:false },
+  { id:'mikulas',   name:'Mikuláš',   img:'images/mikulas.png',   hp:110, attack:15, defense:3, stamina:2, attackStart:0, flip:false },
+  { id:'perchta',   name:'Perchta',   img:'images/perchta.png',   hp:100, attack:19, defense:2, stamina:1, attackStart:0, flip:false },
 ];
 
 /* Čemu odpovídá plná délka proužku na výběrové obrazovce */
-const BAR_MAX = { hp:150, attack:25, shield:3 };
+const BAR_MAX = { hp:150, attack:25, defense:6, stamina:3 };
 
 /* Chování počítače (soupeře) */
 const AI = {
@@ -177,6 +181,7 @@ const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const pick = a => a[Math.floor(Math.random()*a.length)];
 const ACT = { attack:'Útok', defend:'Obrana', charge:'Nabít' };
+const BOLT_SVG = (cls='') => `<svg class="bolt ${cls}" viewBox="0 0 30 40"><path d="M18 2 L4 22 H14 L10 38 L26 15 H16 Z" fill="#ffc933" stroke="#9a5d00" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
 const SHIELD_SVG = (cls='') => `<svg class="${cls}" viewBox="0 0 40 46"><path d="M20 2 L37 8 V22 C37 33 29 41 20 44 C11 41 3 33 3 22 V8 Z" fill="#5aa0ff" stroke="#1d3f7a" stroke-width="3" stroke-linejoin="round"/><path d="M20 8 L31 12 V22 C31 29 26 35 20 38 Z" fill="#fff" opacity=".35"/></svg>`;
 
 let G = null;       // stav souboje
@@ -192,9 +197,10 @@ function buildSelect(){
       <div class="pic"><img src="${c.img}" alt="${c.name}" ${c.flip?'style="transform:scaleX(-1)"':''}></div>
       <h2>${c.name}</h2>
       <div class="stat atk"><span>ÚTOK</span><div class="bar"><i style="width:${pct(c.attack,BAR_MAX.attack)}%"></i></div><b>${c.attack}</b></div>
-      <div class="stat def"><span>OBRANA</span><div class="bar"><i style="width:${pct(c.shieldMax,BAR_MAX.shield)}%"></i></div><b>${c.shieldMax}</b></div>
+      <div class="stat def"><span>OBRANA</span><div class="bar"><i style="width:${pct(c.defense,BAR_MAX.defense)}%"></i></div><b>${c.defense}</b></div>
+      <div class="stat sta"><span>VÝDRŽ</span><div class="bar"><i style="width:${pct(c.stamina,BAR_MAX.stamina)}%"></i></div><b>${c.stamina}</b></div>
       <div class="stat hp"><span>ŽIVOTY</span><div class="bar"><i style="width:${pct(c.hp,BAR_MAX.hp)}%"></i></div><b>${c.hp}</b></div>
-      <small>obrany na startu: ${c.shieldStart} / max ${c.shieldMax}</small>`;
+      <small>${c.attackStart>0 ? 'na začátku má nabitý útok' : 'na začátku bez nabitého útoku'}</small>`;
     el.onclick = () => startBattle(c.id);
     wrap.appendChild(el);
   });
@@ -203,7 +209,9 @@ function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList
 
 /* ---------- Začátek souboje ---------- */
 function mkFighter(ch, side){
-  return { ch, side, hp:ch.hp, shields:ch.shieldStart,
+  // shields = zbývající obrany (veřejné), charges = nabité útoky (neveřejné),
+  // est = odhad počítače, kolik nabitých útoků má tato postava (počítá si ho jen z viděných akcí)
+  return { ch, side, hp:ch.hp, shields:ch.defense, charges:ch.attackStart, est:0,
            wrap: $(side+'F'), box: $(side+'Box') };
 }
 async function startBattle(id){
@@ -239,40 +247,51 @@ function renderBoxes(first){
     if (first) {
       f.box.innerHTML = `<div class="name"><span>${f.ch.name}</span></div>
         <div class="hpline"><span>HP</span><div class="hpbar"><i></i></div></div>
-        <div class="hptxt"></div>${isP?'<div class="shieldrow"></div>':''}`;
+        <div class="hptxt"></div><div class="shieldrow defrow"></div><div class="shieldrow chgrow"></div>`;
     }
     const r = Math.max(0, f.hp)/f.ch.hp, bar = f.box.querySelector('.hpbar i');
     bar.style.width = (r*100)+'%'; bar.style.background = hpColor(r);
     f.box.querySelector('.hptxt').textContent = `${Math.max(0,f.hp)} / ${f.ch.hp}`;
   }
-  // zásoba obran vidí jen hráč
-  const row = G.p.box.querySelector('.shieldrow');
-  let h = '';
-  for (let i=0;i<G.p.ch.shieldMax;i++) h += SHIELD_SVG(i<G.p.shields?'':'off');
-  row.innerHTML = h;
+  // zbývající obrany jsou veřejné u obou postav
+  for (const f of [G.p, G.e]) {
+    let h = '<span class="lbl">Obrany</span>';
+    for (let i=0;i<f.ch.defense;i++) h += SHIELD_SVG(i<f.shields?'':'off');
+    f.box.querySelector('.defrow').innerHTML = h;
+  }
+  // nabité útoky vidí jen hráč u sebe, soupeřovy jsou skryté
+  let c = '<span class="lbl">Nabito</span>';
+  for (let i=0;i<G.p.ch.stamina;i++) c += BOLT_SVG(i<G.p.charges?'':'off');
+  G.p.box.querySelector('.chgrow').innerHTML = c;
+  G.e.box.querySelector('.chgrow').innerHTML = '<span class="lbl">Nabito</span> <b>?</b>';
+  $('atkCount').textContent = `nabito: ${G.p.charges}`;
+  $('defCount').textContent = `zbývá: ${G.p.shields}`;
 }
 function renderControls(){
   const can = !G.busy && !G.over;
-  $('bAtk').disabled = !can;
+  $('bAtk').disabled = !can || G.p.charges<1;
   $('bDef').disabled = !can || G.p.shields<1;
-  $('bChg').disabled = !can || G.p.shields>=G.p.ch.shieldMax;
-  $('defCount').textContent = `v zásobě: ${G.p.shields}`;
+  $('bChg').disabled = !can || G.p.charges>=G.p.ch.stamina;
+  $('atkCount').textContent = `nabito: ${G.p.charges}`;
+  $('defCount').textContent = `zbývá: ${G.p.shields}`;
 }
 
 /* ---------- Počítačový soupeř ---------- */
-function aiChoose(){
-  const me = G.e, opp = G.p;
+function aiChoose(me = G.e, opp = G.p){
   const w = { ...AI.base };
-  const informed = Math.random() < AI.attention;   // někdy „přehlédne“ tvou zásobu
-  if (informed) {
-    if (opp.shields===0) { w.attack += 3; w.defend = Math.max(.3, w.defend-1.5); }
-    else                 { w.attack -= .5; w.defend += .5; }
-    if (opp.hp <= me.ch.attack && opp.shields===0) w.attack += 6;   // vidí smrtelný zásah
+  // veřejné informace: zbývající obrany soupeře
+  if (opp.shields===0) w.attack += 3;           // útok nelze zablokovat
+  else                 w.attack -= .5;          // soupeř se může bránit
+  if (opp.shields===0 && opp.hp <= me.ch.attack) w.attack += 6;   // smrtelný zásah projde
+  // neveřejné: odhad soupeřových nabitých útoků (počítač je jen odhaduje z viděných akcí)
+  if (Math.random() < AI.attention) {
+    if (opp.est<1) { w.defend *= .2; w.charge += 1; }            // soupeř zřejmě nemá čím útočit
+    else           { w.defend += 1.5; if (opp.ch.attack >= me.hp) w.defend += 2; }
   }
-  if (opp.ch.attack >= me.hp) w.defend += 2;                        // bojí se smrtelného zásahu
-  if (me.shields===0) w.charge += 2;
+  if (me.shields<=1) w.defend *= .6;            // šetří poslední obrany
+  if (me.charges<1) { w.attack = 0; w.charge += 3; }
   if (me.shields<1) w.defend = 0;
-  if (me.shields>=me.ch.shieldMax) w.charge = 0;
+  if (me.charges>=me.ch.stamina) w.charge = 0;
   const total = Object.values(w).reduce((a,b)=>a+b,0);
   let r = Math.random()*total;
   for (const k of Object.keys(w)) { r -= w[k]; if (r<=0) return k; }
@@ -285,12 +304,14 @@ function resolve(pa, ea){
   const hit = (att, def, atkAct, defAct) => atkAct==='attack' && defAct!=='defend';
   const dmgToE = hit(P,E,pa,ea) ? P.ch.attack : 0;
   const dmgToP = hit(E,P,ea,pa) ? E.ch.attack : 0;
-  const next = (f, act) => Math.min(f.ch.shieldMax, f.shields - (act==='defend'?1:0) + (act==='charge'?1:0));
+  const shields = (f, act) => f.shields - (act==='defend'?1:0);
+  const charges = (f, act) => Math.min(f.ch.stamina, f.charges - (act==='attack'?1:0) + (act==='charge'?1:0));
   return {
     pa, ea, dmgToE, dmgToP,
     pBlocked: pa==='attack' && ea==='defend',
     eBlocked: ea==='attack' && pa==='defend',
-    pShields: next(P,pa), eShields: next(E,ea),
+    pShields: shields(P,pa), eShields: shields(E,ea),
+    pCharges: charges(P,pa), eCharges: charges(E,ea),
   };
 }
 
@@ -394,7 +415,8 @@ async function faint(f){
 async function playRound(pa){
   if (!G || G.busy || G.over) return;
   if (pa==='defend' && G.p.shields<1) return;
-  if (pa==='charge' && G.p.shields>=G.p.ch.shieldMax) return;
+  if (pa==='attack' && G.p.charges<1) return;
+  if (pa==='charge' && G.p.charges>=G.p.ch.stamina) return;
   G.busy = true; renderControls();
   const P = G.p, E = G.e;
   const ea = aiChoose();
@@ -412,18 +434,25 @@ async function playRound(pa){
   renderBoxes(false);
   await Promise.all(ups);
 
-  // 2) útoky a nabíjení současně
+  // 2) útoky a nabíjení současně (útok spotřebuje jedno nabití, i když je zablokován)
   const jobs = [];
+  if (pa==='attack') P.charges--;
+  if (ea==='attack') E.charges--;
+  renderBoxes(false);
   if (pa==='attack') jobs.push(attackAnim(P, E, r.pBlocked, r.dmgToE, () => { E.hp -= r.dmgToE; renderBoxes(false); }));
   if (ea==='attack') jobs.push(attackAnim(E, P, r.eBlocked, r.dmgToP, () => { P.hp -= r.dmgToP; renderBoxes(false); }));
-  if (pa==='charge') jobs.push(chargeAnim(P).then(() => { P.shields = r.pShields; renderBoxes(false); }));
-  if (ea==='charge') jobs.push(chargeAnim(E).then(() => { E.shields = r.eShields; }));
+  if (pa==='charge') jobs.push(chargeAnim(P).then(() => { P.charges = r.pCharges; renderBoxes(false); }));
+  if (ea==='charge') jobs.push(chargeAnim(E).then(() => { E.charges = r.eCharges; }));
   await Promise.all(jobs);
 
   // 3) úklid
   await Promise.all([shieldDown(P), shieldDown(E)]);
   hideBubble(P); hideBubble(E);
-  P.shields = r.pShields; E.shields = r.eShields; renderBoxes(false);
+  P.shields = r.pShields; E.shields = r.eShields;
+  P.charges = r.pCharges; E.charges = r.eCharges;
+  P.est = Math.max(0, Math.min(P.ch.stamina, P.est + (pa==='charge'?1:0) - (pa==='attack'?1:0)));   // co si počítač „všiml“
+  E.est = Math.max(0, Math.min(E.ch.stamina, E.est + (ea==='charge'?1:0) - (ea==='attack'?1:0)));
+  renderBoxes(false);
 
   setMsg(describe(r));
   await sleep(700);
@@ -445,7 +474,7 @@ function describe(r){
   const side = (name, act, dealt, blocked, foeAct) => {
     if (act==='attack') return blocked ? `${name} útočí, ale soupeř se ubránil.` : `${name} útočí – zásah za ${dealt}!`;
     if (act==='defend') return foeAct==='attack' ? `${name} se brání – štít zachytil útok!` : `${name} se brání zbytečně…`;
-    return `${name} nabíjí obranu.`;
+    return `${name} nabíjí útok.`;
   };
   out.push(side(P, r.pa, r.dmgToE, r.pBlocked, r.ea));
   out.push(side(E, r.ea, r.dmgToP, r.eBlocked, r.pa));
