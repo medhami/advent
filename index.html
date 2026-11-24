@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3b1530">
+<title>Adventní bitva</title>
+<style>
+:root{
+  --wine:#3b1530; --wine2:#5a2145; --gold:#f0b429; --gold-d:#a8730b;
+  --cream:#fff6dc; --ink:#2a1a14; --red:#d6453d; --red-d:#8f241e;
+  --blue:#3f7fd1; --blue-d:#234f8f; --green:#4cb85a; --yellow:#e8c23a;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#1a0a15;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;color:var(--ink);
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;overscroll-behavior:none}
+#app{position:relative;height:100dvh;max-width:520px;margin:0 auto;overflow:hidden;background:var(--wine)}
+.screen{position:absolute;inset:0;display:none;flex-direction:column}
+.screen.active{display:flex}
+
+/* ---------- VÝBĚR POSTAVY ---------- */
+#screen-select{background:
+  linear-gradient(rgba(40,12,30,.82),rgba(40,12,30,.92)),url(images/pozadi.jpg) center/cover;overflow-y:auto}
+.title{text-align:center;padding:calc(env(safe-area-inset-top) + 18px) 16px 6px;color:var(--cream)}
+.title h1{margin:0;font-size:28px;letter-spacing:1px;color:var(--gold);text-shadow:0 3px 0 #000a}
+.title p{margin:4px 0 0;font-size:15px;opacity:.9}
+#cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 14px calc(env(safe-area-inset-bottom) + 24px)}
+.card{background:var(--cream);border:3px solid var(--gold-d);border-radius:14px;padding:8px 8px 10px;cursor:pointer;
+  box-shadow:0 4px 0 #0007;transition:transform .1s;display:flex;flex-direction:column;align-items:center}
+.card:active{transform:translateY(3px);box-shadow:0 1px 0 #0007}
+.card .pic{height:140px;display:flex;align-items:flex-end;justify-content:center;width:100%}
+.card .pic img{max-height:100%;max-width:100%;object-fit:contain;filter:drop-shadow(0 3px 2px #0004)}
+.card h2{margin:6px 0 6px;font-size:18px;text-align:center}
+.stat{width:100%;display:grid;grid-template-columns:62px 1fr 26px;gap:5px;align-items:center;font-size:11px;font-weight:700;margin:2px 0}
+.stat .bar{height:9px;background:#0002;border-radius:5px;overflow:hidden}
+.stat .bar i{display:block;height:100%;border-radius:5px}
+.stat b{text-align:right}
+.stat.atk i{background:var(--red)} .stat.def i{background:var(--blue)} .stat.hp i{background:var(--green)}
+.card small{font-size:10.5px;opacity:.7;margin-top:2px}
+
+/* ---------- BITVA ---------- */
+#stage{position:relative;flex:1;min-height:0;overflow:hidden;background:url(images/pozadi.jpg) center 35%/cover}
+#stage::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(30,10,20,.35));pointer-events:none}
+.infobox{position:absolute;z-index:5;background:var(--cream);border:3px solid var(--ink);border-radius:12px;padding:6px 10px 7px;
+  min-width:158px;box-shadow:0 3px 0 #0006}
+.infobox .name{font-weight:800;font-size:15px;display:flex;justify-content:space-between;gap:8px}
+.hpline{display:flex;align-items:center;gap:6px;margin-top:3px}
+.hpline span{font-size:10px;font-weight:800;background:var(--ink);color:var(--gold);border-radius:4px;padding:1px 4px}
+.hpbar{flex:1;height:10px;border:2px solid var(--ink);border-radius:6px;background:#fff;overflow:hidden}
+.hpbar i{display:block;height:100%;width:100%;background:var(--green);transition:width .7s ease,background .3s}
+.hptxt{font-size:11px;font-weight:700;text-align:right;margin-top:2px;min-height:14px}
+#enemyBox{top:calc(env(safe-area-inset-top) + 12px);left:10px}
+#playerBox{bottom:12px;right:10px}
+.shieldrow{display:flex;gap:3px;align-items:center;font-size:10px;font-weight:800;margin-top:2px}
+.shieldrow svg{width:17px;height:19px}
+.shieldrow .off path{fill:#0002;stroke:#0004}
+
+.fighter{position:absolute;z-index:3}
+.fighter .sprite{height:100%;display:block;transform-origin:50% 100%}
+.fighter .sprite img{height:100%;width:auto;display:block}
+.fighter::before{content:"";position:absolute;left:5%;right:5%;bottom:-6px;height:14px;border-radius:50%;background:radial-gradient(#0007,transparent 70%);z-index:-1}
+#enemyF{right:7%;top:16%;height:31%}
+#playerF{left:5%;bottom:7%;height:39%;z-index:4}
+.flip img{transform:scaleX(-1)}
+.glow{position:absolute;left:-25%;right:-25%;top:5%;bottom:-5%;border-radius:50%;opacity:0;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,224,110,.95),rgba(255,190,50,.45) 45%,transparent 70%);z-index:-1}
+.shield-fx{position:absolute;width:64px;height:72px;opacity:0;pointer-events:none;z-index:6}
+#playerF .shield-fx{right:-40px;top:8%}
+#enemyF .shield-fx{left:-40px;bottom:12%}
+.bubble{position:absolute;z-index:8;left:50%;top:-34px;transform:translateX(-50%) scale(0);background:#fff;border:3px solid var(--ink);
+  border-radius:12px;padding:3px 10px;font-weight:800;font-size:14px;white-space:nowrap;opacity:0}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-9px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--ink);border-bottom:0}
+.bubble.atk{background:#ffd9d4}.bubble.def{background:#d3e5ff}.bubble.chg{background:#fff0b3}
+
+.fx{position:absolute;z-index:9;pointer-events:none}
+.scratch svg{overflow:visible;filter:drop-shadow(0 0 4px #d00)}
+.scratch line{stroke:#fff;stroke-width:5;stroke-linecap:round;stroke-dasharray:90;stroke-dashoffset:90;animation:draw .16s forwards}
+.scratch line:nth-child(2){animation-delay:.08s}.scratch line:nth-child(3){animation-delay:.16s}
+@keyframes draw{to{stroke-dashoffset:0}}
+.floatxt{font-weight:900;font-size:30px;color:#fff;text-shadow:-2px -2px 0 #b01e18,2px -2px 0 #b01e18,-2px 2px 0 #b01e18,2px 2px 0 #b01e18,0 4px 0 #000a;
+  white-space:nowrap;transform:translateX(-50%)}
+.floatxt.blk{font-size:20px;color:#fff;text-shadow:-2px -2px 0 #234f8f,2px -2px 0 #234f8f,-2px 2px 0 #234f8f,2px 2px 0 #234f8f}
+.spark{width:14px;height:14px;color:var(--gold);font-size:16px;line-height:14px;text-align:center;text-shadow:0 0 6px #fff}
+
+/* ---------- OVLÁDÁNÍ ---------- */
+#panel{background:var(--wine);border-top:4px solid var(--gold-d);padding:10px 12px calc(env(safe-area-inset-bottom) + 12px)}
+#msg{background:var(--cream);border:3px solid var(--ink);border-radius:10px;padding:8px 12px;min-height:56px;font-size:15px;font-weight:600;
+  display:flex;align-items:center;margin-bottom:10px;line-height:1.25}
+#btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.btn{border:3px solid var(--ink);border-radius:12px;padding:10px 4px 8px;font:inherit;font-weight:900;font-size:16px;color:#fff;cursor:pointer;
+  box-shadow:0 4px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:1px;text-shadow:0 2px 0 #0005}
+.btn small{font-size:11px;font-weight:700;opacity:.95}
+.btn .ic{font-size:22px;line-height:1}
+.btn:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.btn.atk{background:var(--red)} .btn.def{background:var(--blue)} .btn.chg{background:#d99a10}
+.btn:disabled{background:#8a8087;color:#ddd;cursor:not-allowed;box-shadow:0 4px 0 #3a3338}
+.btn:disabled .ic{filter:grayscale(1);opacity:.6}
+
+/* ---------- VÝSLEDEK ---------- */
+#result{position:absolute;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(20,5,15,.72)}
+#result.show{display:flex}
+#result .box{background:var(--cream);border:4px solid var(--gold-d);border-radius:18px;padding:22px 20px;text-align:center;width:min(86%,340px);
+  box-shadow:0 6px 0 #0008;animation:pop .35s cubic-bezier(.2,1.6,.4,1)}
+#result h2{margin:0 0 6px;font-size:30px}
+#result p{margin:0 0 16px;font-size:15px}
+#result .btn{width:100%;margin-top:8px;flex-direction:row;justify-content:center;font-size:17px;padding:12px}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="screen-select" class="screen active">
+    <div class="title"><h1>⭐ Adventní bitva ⭐</h1><p>Vyber si svého bojovníka</p></div>
+    <div id="cards"></div>
+  </section>
+
+  <section id="screen-battle" class="screen">
+    <div id="stage">
+      <div id="enemyBox" class="infobox"></div>
+      <div id="playerBox" class="infobox"></div>
+      <div id="enemyF" class="fighter"></div>
+      <div id="playerF" class="fighter"></div>
+      <div id="result"><div class="box"><h2 id="resTitle"></h2><p id="resText"></p>
+        <button class="btn atk" id="againBtn">⚔️ Hrát znovu</button>
+        <button class="btn chg" id="menuBtn">↩ Změnit postavu</button></div></div>
+    </div>
+    <div id="panel">
+      <div id="msg"></div>
+      <div id="btns">
+        <button class="btn atk" id="bAtk"><span class="ic">⚔️</span>Útok</button>
+        <button class="btn def" id="bDef"><span class="ic">🛡️</span>Obrana<small id="defCount"></small></button>
+        <button class="btn chg" id="bChg"><span class="ic">⚡</span>Nabít<small>obranu</small></button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* =====================================================================
+   NASTAVENÍ HRY  –  zde si můžeš staty a chování upravovat ručně
+   =====================================================================
+   hp          = životy postavy
+   attack      = kolik životů ubere při zásahu
+   shieldStart = kolik obran má postava na začátku souboje
+   shieldMax   = kolik obran si může maximálně držet v zásobě
+   flip        = true, pokud je potřeba obrázek zrcadlově otočit
+   (Čísla jsou zatím jen zkušební – klidně je přepiš.)
+*/
+const CHARACTERS = [
+  { id:'zber',      name:'Žber',      img:'images/zber.png',      hp:140, attack:10, shieldStart:1, shieldMax:3, flip:false },
+  { id:'ambroz',    name:'Ambrož',    img:'images/ambroz.png',    hp: 90, attack:22, shieldStart:0, shieldMax:2, flip:false },
+  { id:'barborka',  name:'Barborka',  img:'images/barborka.png',  hp:110, attack:14, shieldStart:1, shieldMax:2, flip:false },
+  { id:'barborka2', name:'Barborka II', img:'images/barborka2.png', hp:100, attack:16, shieldStart:1, shieldMax:2, flip:false },
+  { id:'lucka',     name:'Lucka',     img:'images/lucka.png',     hp: 95, attack:15, shieldStart:1, shieldMax:3, flip:false },
+  { id:'mikulas',   name:'Mikuláš',   img:'images/mikulas.png',   hp:120, attack:14, shieldStart:1, shieldMax:2, flip:false },
+  { id:'perchta',   name:'Perchta',   img:'images/perchta.png',   hp:100, attack:20, shieldStart:0, shieldMax:2, flip:false },
+];
+
+/* Čemu odpovídá plná délka proužku na výběrové obrazovce */
+const BAR_MAX = { hp:150, attack:25, shield:3 };
+
+/* Chování počítače (soupeře) */
+const AI = {
+  attention: 0.8,                           // 0–1: jak často počítač „sleduje“ tvou zásobu obran (1 = vždy)
+  base: { attack:3, defend:2, charge:3 },   // základní chuť na jednotlivé akce
+};
+
+/* Rychlost animací (ms) – vše na jednom místě */
+const T = { hop:620, reveal:650, shield:380, charge:950, faint:900 };
+
+/* =====================================================================
+   KÓD HRY
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const ACT = { attack:'Útok', defend:'Obrana', charge:'Nabít' };
+const SHIELD_SVG = (cls='') => `<svg class="${cls}" viewBox="0 0 40 46"><path d="M20 2 L37 8 V22 C37 33 29 41 20 44 C11 41 3 33 3 22 V8 Z" fill="#5aa0ff" stroke="#1d3f7a" stroke-width="3" stroke-linejoin="round"/><path d="M20 8 L31 12 V22 C31 29 26 35 20 38 Z" fill="#fff" opacity=".35"/></svg>`;
+
+let G = null;       // stav souboje
+let myCharId = null;
+
+/* ---------- Výběr postavy ---------- */
+function buildSelect(){
+  const wrap = $('cards'); wrap.innerHTML = '';
+  CHARACTERS.forEach(c => {
+    const el = document.createElement('div'); el.className = 'card';
+    const pct = (v,m) => Math.max(4, Math.min(100, v/m*100));
+    el.innerHTML = `
+      <div class="pic"><img src="${c.img}" alt="${c.name}" ${c.flip?'style="transform:scaleX(-1)"':''}></div>
+      <h2>${c.name}</h2>
+      <div class="stat atk"><span>ÚTOK</span><div class="bar"><i style="width:${pct(c.attack,BAR_MAX.attack)}%"></i></div><b>${c.attack}</b></div>
+      <div class="stat def"><span>OBRANA</span><div class="bar"><i style="width:${pct(c.shieldMax,BAR_MAX.shield)}%"></i></div><b>${c.shieldMax}</b></div>
+      <div class="stat hp"><span>ŽIVOTY</span><div class="bar"><i style="width:${pct(c.hp,BAR_MAX.hp)}%"></i></div><b>${c.hp}</b></div>
+      <small>obrany na startu: ${c.shieldStart} / max ${c.shieldMax}</small>`;
+    el.onclick = () => startBattle(c.id);
+    wrap.appendChild(el);
+  });
+}
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id===id)); }
+
+/* ---------- Začátek souboje ---------- */
+function mkFighter(ch, side){
+  return { ch, side, hp:ch.hp, shields:ch.shieldStart,
+           wrap: $(side+'F'), box: $(side+'Box') };
+}
+async function startBattle(id){
+  myCharId = id;
+  const me = CHARACTERS.find(c => c.id===id);
+  const foe = pick(CHARACTERS.filter(c => c.id!==id));
+  G = { p: mkFighter(me,'player'), e: mkFighter(foe,'enemy'), busy:true, over:false };
+  $('result').classList.remove('show');
+  for (const f of [G.p, G.e]) {
+    f.wrap.innerHTML = `<div class="glow"></div>
+      <div class="sprite ${f.ch.flip?'flip':''}"><img src="${f.ch.img}" alt="${f.ch.name}"></div>
+      <div class="shield-fx">${SHIELD_SVG()}</div><div class="bubble"></div>`;
+    f.sprite = f.wrap.querySelector('.sprite'); f.glow = f.wrap.querySelector('.glow');
+    f.shieldFx = f.wrap.querySelector('.shield-fx'); f.bubble = f.wrap.querySelector('.bubble');
+  }
+  renderBoxes(true); renderControls();
+  show('screen-battle');
+  setMsg(`Do arény vstupuje ${foe.name}!`);
+  // vjezd postav
+  G.p.wrap.animate([{transform:'translateX(-120%)'},{transform:'none'}],{duration:600,easing:'ease-out'});
+  await G.e.wrap.animate([{transform:'translateX(120%)'},{transform:'none'}],{duration:600,easing:'ease-out'}).finished;
+  await sleep(500);
+  setMsg('Vyber svou akci. Soupeř volí také – tajně!');
+  G.busy = false; renderControls();
+}
+
+/* ---------- Vykreslení ---------- */
+function setMsg(t){ $('msg').textContent = t; }
+function hpColor(r){ return r>.5 ? 'var(--green)' : r>.25 ? 'var(--yellow)' : 'var(--red)'; }
+function renderBoxes(first){
+  for (const f of [G.p, G.e]) {
+    const isP = f===G.p;
+    if (first) {
+      f.box.innerHTML = `<div class="name"><span>${f.ch.name}</span></div>
+        <div class="hpline"><span>HP</span><div class="hpbar"><i></i></div></div>
+        <div class="hptxt"></div>${isP?'<div class="shieldrow"></div>':''}`;
+    }
+    const r = Math.max(0, f.hp)/f.ch.hp, bar = f.box.querySelector('.hpbar i');
+    bar.style.width = (r*100)+'%'; bar.style.background = hpColor(r);
+    f.box.querySelector('.hptxt').textContent = `${Math.max(0,f.hp)} / ${f.ch.hp}`;
+  }
+  // zásoba obran vidí jen hráč
+  const row = G.p.box.querySelector('.shieldrow');
+  let h = '';
+  for (let i=0;i<G.p.ch.shieldMax;i++) h += SHIELD_SVG(i<G.p.shields?'':'off');
+  row.innerHTML = h;
+}
+function renderControls(){
+  const can = !G.busy && !G.over;
+  $('bAtk').disabled = !can;
+  $('bDef').disabled = !can || G.p.shields<1;
+  $('bChg').disabled = !can || G.p.shields>=G.p.ch.shieldMax;
+  $('defCount').textContent = `v zásobě: ${G.p.shields}`;
+}
+
+/* ---------- Počítačový soupeř ---------- */
+function aiChoose(){
+  const me = G.e, opp = G.p;
+  const w = { ...AI.base };
+  const informed = Math.random() < AI.attention;   // někdy „přehlédne“ tvou zásobu
+  if (informed) {
+    if (opp.shields===0) { w.attack += 3; w.defend = Math.max(.3, w.defend-1.5); }
+    else                 { w.attack -= .5; w.defend += .5; }
+    if (opp.hp <= me.ch.attack && opp.shields===0) w.attack += 6;   // vidí smrtelný zásah
+  }
+  if (opp.ch.attack >= me.hp) w.defend += 2;                        // bojí se smrtelného zásahu
+  if (me.shields===0) w.charge += 2;
+  if (me.shields<1) w.defend = 0;
+  if (me.shields>=me.ch.shieldMax) w.charge = 0;
+  const total = Object.values(w).reduce((a,b)=>a+b,0);
+  let r = Math.random()*total;
+  for (const k of Object.keys(w)) { r -= w[k]; if (r<=0) return k; }
+  return 'attack';
+}
+
+/* ---------- Vyhodnocení kola (čistá logika) ---------- */
+function resolve(pa, ea){
+  const P = G.p, E = G.e;
+  const hit = (att, def, atkAct, defAct) => atkAct==='attack' && defAct!=='defend';
+  const dmgToE = hit(P,E,pa,ea) ? P.ch.attack : 0;
+  const dmgToP = hit(E,P,ea,pa) ? E.ch.attack : 0;
+  const next = (f, act) => Math.min(f.ch.shieldMax, f.shields - (act==='defend'?1:0) + (act==='charge'?1:0));
+  return {
+    pa, ea, dmgToE, dmgToP,
+    pBlocked: pa==='attack' && ea==='defend',
+    eBlocked: ea==='attack' && pa==='defend',
+    pShields: next(P,pa), eShields: next(E,ea),
+  };
+}
+
+/* ---------- Animace ---------- */
+const anim = (el, kf, o={}) => el.animate(kf, { fill:'none', ...o }).finished;
+function stageRect(){ return $('stage').getBoundingClientRect(); }
+function center(el){ const r = el.getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2, r }; }
+function addFx(html, x, y, cls=''){
+  const s = stageRect(), d = document.createElement('div');
+  d.className = 'fx '+cls; d.innerHTML = html;
+  d.style.left = (x - s.left)+'px'; d.style.top = (y - s.top)+'px';
+  $('stage').appendChild(d); return d;
+}
+function floatText(txt, f, cls=''){
+  const c = center(f.wrap);
+  const d = addFx(txt, c.x, c.r.top + c.r.height*.2, 'floatxt '+cls);
+  d.animate([{transform:'translateX(-50%) translateY(0) scale(.5)',opacity:0},
+             {transform:'translateX(-50%) translateY(-14px) scale(1.2)',opacity:1,offset:.25},
+             {transform:'translateX(-50%) translateY(-46px) scale(1)',opacity:1,offset:.75},
+             {transform:'translateX(-50%) translateY(-60px) scale(1)',opacity:0}],{duration:1100}).finished.then(()=>d.remove());
+}
+function scratchFx(f){
+  const c = center(f.wrap);
+  const d = addFx(`<svg width="90" height="90" viewBox="0 0 90 90">
+    <line x1="14" y1="8" x2="48" y2="80"/><line x1="38" y1="4" x2="72" y2="76"/><line x1="62" y1="2" x2="90" y2="62"/></svg>`,
+    c.x-45, c.y-45, 'scratch');
+  setTimeout(() => d.animate([{opacity:1},{opacity:0}],{duration:300}).finished.then(()=>d.remove()), 420);
+}
+async function hitReaction(f){
+  scratchFx(f);
+  const s = f.sprite;
+  await anim(s, [
+    {transform:'translateX(0)',opacity:1,filter:'none'},
+    {transform:'translateX(-12px)',opacity:.2,filter:'brightness(2) saturate(3)',offset:.15},
+    {transform:'translateX(10px)',opacity:1,offset:.3},
+    {transform:'translateX(-8px)',opacity:.2,offset:.45},
+    {transform:'translateX(6px)',opacity:1,offset:.6},
+    {transform:'translateX(-4px)',opacity:.4,offset:.8},
+    {transform:'translateX(0)',opacity:1,filter:'none'}], {duration:620});
+}
+async function showBubble(f, act, ms){
+  const b = f.bubble;
+  b.className = 'bubble '+({attack:'atk',defend:'def',charge:'chg'}[act]);
+  b.textContent = {attack:'⚔️ Útok!',defend:'🛡️ Obrana!',charge:'⚡ Nabíjí!'}[act];
+  b.style.opacity = 1;
+  await anim(b,[{transform:'translateX(-50%) scale(0)'},{transform:'translateX(-50%) scale(1.15)',offset:.6},{transform:'translateX(-50%) scale(1)'}],
+             {duration:ms, fill:'forwards'});
+}
+function hideBubble(f){ f.bubble.getAnimations().forEach(a=>a.cancel()); f.bubble.style.opacity = 0; }
+async function shieldUp(f){
+  f.shieldFx.style.opacity = 1;
+  await anim(f.shieldFx,[{transform:'scale(0) rotate(-30deg)'},{transform:'scale(1.25) rotate(6deg)',offset:.65},{transform:'scale(1) rotate(0)'}],
+             {duration:T.shield, fill:'forwards'});
+}
+async function shieldDown(f){
+  if (f.shieldFx.style.opacity==='0' || f.shieldFx.style.opacity==='') return;
+  await anim(f.shieldFx,[{opacity:1},{opacity:0}],{duration:250});
+  f.shieldFx.getAnimations().forEach(a=>a.cancel()); f.shieldFx.style.opacity = 0;
+}
+async function blockFx(f){
+  floatText('Zablokováno!', f, 'blk');
+  await anim(f.shieldFx,[{transform:'scale(1)',filter:'none'},{transform:'scale(1.35)',filter:'brightness(2.2)',offset:.3},
+                         {transform:'rotate(-10deg) scale(1.1)',offset:.6},{transform:'scale(1)',filter:'none'}],{duration:480});
+}
+async function attackAnim(att, tgt, blocked, dmg, onHp){
+  const a = center(att.wrap), b = center(tgt.wrap);
+  const dx = (b.x-a.x)*.55, dy = (b.y-a.y)*.55;
+  const hop = anim(att.wrap,[
+    {transform:'translate(0,0)',offset:0},
+    {transform:`translate(0,-14px)`,offset:.12},
+    {transform:`translate(${dx}px,${dy-18}px) scale(1.06)`,offset:.45,easing:'ease-in'},
+    {transform:`translate(${dx}px,${dy}px) scale(1.06)`,offset:.55},
+    {transform:'translate(0,0)',offset:1}], {duration:T.hop, easing:'ease-out'});
+  await sleep(T.hop*.5);
+  if (blocked) { await blockFx(tgt); }
+  else { floatText('−'+dmg, tgt); onHp(); await hitReaction(tgt); }
+  await hop;
+}
+async function chargeAnim(f){
+  f.glow.style.opacity = 0;
+  const glow = anim(f.glow,[{opacity:0,transform:'scale(.6)'},{opacity:1,transform:'scale(1)',offset:.4},{opacity:0,transform:'scale(1.15)'}],{duration:T.charge});
+  const c = center(f.wrap);
+  for (let i=0;i<9;i++){
+    const x = c.r.left + c.r.width*(.1+Math.random()*.8), y = c.r.bottom - c.r.height*(.1+Math.random()*.4);
+    const d = addFx('✦', x, y, 'spark');
+    d.animate([{transform:'translateY(0) scale(.4)',opacity:0},
+               {opacity:1,offset:.25},
+               {transform:`translateY(${-60-Math.random()*70}px) scale(1.3) rotate(${Math.random()*180}deg)`,opacity:0}],
+               {duration:700+Math.random()*350, delay:Math.random()*350}).finished.then(()=>d.remove());
+  }
+  await anim(f.sprite,[{transform:'scale(1,1)'},{transform:'scale(1.06,.82)',offset:.3},{transform:'scale(1.06,.82)',offset:.6},
+                       {transform:'scale(.96,1.1)',offset:.8},{transform:'scale(1,1)'}],{duration:T.charge});
+  await glow;
+}
+async function faint(f){
+  await anim(f.sprite,[{transform:'translateY(0) rotate(0)',opacity:1},{transform:'translateY(40px) rotate(18deg)',opacity:0}],
+             {duration:T.faint, fill:'forwards', easing:'ease-in'});
+}
+
+/* ---------- Průběh kola ---------- */
+async function playRound(pa){
+  if (!G || G.busy || G.over) return;
+  if (pa==='defend' && G.p.shields<1) return;
+  if (pa==='charge' && G.p.shields>=G.p.ch.shieldMax) return;
+  G.busy = true; renderControls();
+  const P = G.p, E = G.e;
+  const ea = aiChoose();
+  const r = resolve(pa, ea);
+
+  setMsg('Obě postavy se rozhodly… Odhalení!');
+  await sleep(450);
+  await Promise.all([showBubble(P, pa, T.reveal), showBubble(E, ea, T.reveal)]);
+  await sleep(350);
+
+  // 1) obrany se zvednou a spotřebují
+  const ups = [];
+  if (pa==='defend') { ups.push(shieldUp(P)); P.shields--; }
+  if (ea==='defend') { ups.push(shieldUp(E)); E.shields--; }
+  renderBoxes(false);
+  await Promise.all(ups);
+
+  // 2) útoky a nabíjení současně
+  const jobs = [];
+  if (pa==='attack') jobs.push(attackAnim(P, E, r.pBlocked, r.dmgToE, () => { E.hp -= r.dmgToE; renderBoxes(false); }));
+  if (ea==='attack') jobs.push(attackAnim(E, P, r.eBlocked, r.dmgToP, () => { P.hp -= r.dmgToP; renderBoxes(false); }));
+  if (pa==='charge') jobs.push(chargeAnim(P).then(() => { P.shields = r.pShields; renderBoxes(false); }));
+  if (ea==='charge') jobs.push(chargeAnim(E).then(() => { E.shields = r.eShields; }));
+  await Promise.all(jobs);
+
+  // 3) úklid
+  await Promise.all([shieldDown(P), shieldDown(E)]);
+  hideBubble(P); hideBubble(E);
+  P.shields = r.pShields; E.shields = r.eShields; renderBoxes(false);
+
+  setMsg(describe(r));
+  await sleep(700);
+
+  // 4) konec souboje?
+  const pDead = P.hp<=0, eDead = E.hp<=0;
+  if (pDead || eDead) {
+    G.over = true; renderControls();
+    await Promise.all([pDead?faint(P):0, eDead?faint(E):0]);
+    await sleep(250);
+    endScreen(pDead, eDead);
+    return;
+  }
+  setMsg('Vyber další akci.');
+  G.busy = false; renderControls();
+}
+function describe(r){
+  const P = G.p.ch.name, E = G.e.ch.name, out = [];
+  const side = (name, act, dealt, blocked, foeAct) => {
+    if (act==='attack') return blocked ? `${name} útočí, ale soupeř se ubránil.` : `${name} útočí – zásah za ${dealt}!`;
+    if (act==='defend') return foeAct==='attack' ? `${name} se brání – štít zachytil útok!` : `${name} se brání zbytečně…`;
+    return `${name} nabíjí obranu.`;
+  };
+  out.push(side(P, r.pa, r.dmgToE, r.pBlocked, r.ea));
+  out.push(side(E, r.ea, r.dmgToP, r.eBlocked, r.pa));
+  return out.join(' ');
+}
+function endScreen(pDead, eDead){
+  const P = G.p.ch.name, E = G.e.ch.name;
+  let t, s;
+  if (pDead && eDead) { t='🤝 Remíza!'; s=`${P} i ${E} padli ve stejném kole.`; }
+  else if (eDead)     { t='🏆 Vítězství!'; s=`${P} porazil(a) soupeře: ${E}.`; }
+  else                { t='💀 Prohra'; s=`${E} byl(a) tentokrát silnější.`; }
+  $('resTitle').textContent = t; $('resText').textContent = s;
+  $('result').classList.add('show');
+}
+
+/* ---------- Ovládání ---------- */
+$('bAtk').onclick = () => playRound('attack');
+$('bDef').onclick = () => playRound('defend');
+$('bChg').onclick = () => playRound('charge');
+$('againBtn').onclick = () => startBattle(myCharId);
+$('menuBtn').onclick = () => { G = null; show('screen-select'); };
+
+buildSelect();
+CHARACTERS.forEach(c => { const i = new Image(); i.src = c.img; });   // předčtení obrázků
+</script>
+</body>
+</html>
